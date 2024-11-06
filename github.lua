@@ -72,4 +72,3 @@ function loadstring(src, chunkname)
 end
 
     
-print'hello skid'
