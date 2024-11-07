@@ -27,6 +27,21 @@ function HttpGet(url)
 	return response
 end
 
+function info(...)
+    local b = table.concat({...}, " ")
+ 
+    local a = {
+        Url = "http://localhost:2024/info",
+        Method = "POST",
+        Headers = {
+            ["Content-Type"] = "text/plain"
+        },
+        Body = b
+    }
+    
+    return request(a).Body
+end
+
 function HttpGetAsync(...)
     local b = table.concat({...}, " ")
  
