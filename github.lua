@@ -304,9 +304,15 @@ function islclosure(func)
 	end)
 	return success
 end
+	
 function iscclosure(func)
 	assert(type(func) == "function", "invalid argument #1 to 'iscclosure' (function expected, got " .. type(func) .. ") ", 2)
     return not islclosure(func)
+end
+
+function isreadonly(tbl)
+ if type(tbl) ~= 'table' then return false end
+ return table.isfrozen(tbl)
 end
 
 function newcclosure(p1)
@@ -316,5 +322,56 @@ function newcclosure(p1)
 		end
 	end)
 end
+ 
+function getrenv()
+    return {}
+end
 
-    
+	function lz4compress(input)
+    local output = ""
+    local pos = 1
+    local len = #input
+    while pos <= len do
+        local max_match_len = 0
+        local max_match_pos = pos
+        local len = #input
+        for i = pos - 1, 1, -1 do
+            local match_len = 0
+            while i + match_len <= len and input:sub(pos + match_len, pos + match_len) == input:sub(i + match_len, i + match_len) do
+                match_len = match_len + 1
+            end
+            if match_len > max_match_len then
+                max_match_len = match_len
+                max_match_pos = i
+            end
+        end
+        local match_pos, match_len = max_match_pos, max_match_len
+        if match_len > 4 then
+            output = output .. "*" .. string.char(math.floor(match_pos / 256)) .. string.char(match_pos % 256) .. string.char((match_len - 4) % 256)
+            pos = pos + match_len
+        else
+            output = output .. input:sub(pos, pos)
+            pos = pos + 1
+        end
+    end
+    return output
+end
+ 
+function lz4decompress(input)
+    local output = ""
+    local pos = 1
+    local len = #input
+    while pos <= len do
+        local byte = input:sub(pos, pos)
+        if byte == "*" then
+            local match_pos = input:byte(pos + 1) * 256 + input:byte(pos + 2)
+            local match_len = input:byte(pos + 3) + 4
+            output = output .. output:sub(#output - match_pos + 1, #output - match_pos + match_len)
+            pos = pos + 4
+        else
+            output = output .. byte
+            pos = pos + 1
+        end
+    end
+    return output
+end
