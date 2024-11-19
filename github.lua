@@ -27,6 +27,21 @@ function HttpGet(url)
 	return response
 end
 
+function HttpGetAsync(...)
+    local b = table.concat({...}, " ")
+ 
+    local a = {
+        Url = "http://localhost:2024/httpget",
+        Method = "POST",
+        Headers = {
+            ["Content-Type"] = "text/plain"
+        },
+        Body = b
+    }
+    
+    return request(a).Body
+end
+
 function info(...)
     local b = table.concat({...}, " ")
  
@@ -42,11 +57,11 @@ function info(...)
     return request(a).Body
 end
 
-function HttpGetAsync(...)
+function setclipboard(...)
     local b = table.concat({...}, " ")
  
     local a = {
-        Url = "http://localhost:2024/httpget",
+        Url = "http://localhost:2024/setclipboard",
         Method = "POST",
         Headers = {
             ["Content-Type"] = "text/plain"
@@ -96,282 +111,93 @@ function loadstring(src, chunkname)
     end
 end
 
+	local wrappercache = setmetatable({}, {__mode = "k"})
 
-local temp_identity = 6
-
-function printidentity()
-    print("Current identity is 6")
-end
-
-function getspoofedidentity()
-    print("Current identity is "..temp_identity)
-end
-
-function getthreadidentity()
-    return temp_identity
-end
-
-function getidentity()
-    return temp_identity
-end
-
-function getthreadcontext()
-    return temp_identity
-end
-
-function setthreadidentity(a1)
-    if (a1 > 8) then
-        error("Current identity can not exceed 8", 2)
-    else
-        temp_identity = a1
-        printidentity = getspoofedidentity
-    end
-end
-
-function setthreadcontext(a1)
-    if (a1 > 8) then
-        error("Current identity cannot be over 8", 2)
-    else
-        temp_identity = a1
-        printidentity = getspoofedidentity
-    end
-end
-
-function setidentity(a1)
-    if (a1 > 8) then
-        error("Current identity cannot be over 8", 2)
-    else
-        temp_identity = a1
-        printidentity = getspoofedidentity
-    end
-end
-
-function getexecutorname()
-    return "nyxss"
-end
-
-function getexecutorversion()
-    return "6.0"
-end
-
-function identifyexecutor()
-    return getexecutorname(), getexecutorversion()
-end
-
-function checkcaller()
-	return getidentity() > 3
-end
-
-function isluau()
-    return true
-end
-
-function fireproximityprompt(Obj, Amount, Skip)
-	assert(typeof(Obj) == "Instance", "invalid argument #1 to 'fireproximityprompt' (ProximityPrompt expected, got " .. type(Spoof) .. ") ")
-	assert(Obj.ClassName == "ProximityPrompt", "invalid argument #1 to 'fireproximityprompt' (ProximityPrompt expected, got " .. type(Spoof) .. ") ")
-    assert(type(Amount) == "number", "invalid argument #2 to 'fireproximityprompt' (number expected, got " .. type(Amount) .. ") ", 2)
-	Amount = Amount or 1
-    local PromptTime = Obj.HoldDuration
-    if Skip then
-        Obj.HoldDuration = 0
-    end
-    for i = 1, Amount do
-        Obj:InputHoldBegin()
-        if not Skip then
-            wait(Obj.HoldDuration)
-        end
-        Obj:InputHoldEnd()
-    end
-    Obj.HoldDuration = PromptTime
-end
-
-function fireclickdetector(part)
-    local cd = part:FindFirstChild("ClickDetector") or part
-    local old_parent = cd.Parent
-    local p = Instance.new("Part")
-    p.Transparency = 1
-    p.Size = Vector3.new(30, 30, 30)
-    p.Anchored = true
-    p.CanCollide = false
-    p.Parent = workspace
-    cd.Parent = p
-    cd.MaxActivationDistance = math.huge
-
-    local conn
-    conn = game:GetService("RunService").Heartbeat:Connect(function()
-        p.CFrame = workspace.Camera.CFrame * CFrame.new(0, 0, -20) * CFrame.new(workspace.Camera.CFrame.LookVector.X, workspace.Camera.CFrame.LookVector.Y, workspace.Camera.CFrame.LookVector.Z)
-        game:GetService("VirtualUser"):ClickButton1(Vector2.new(20, 20), workspace:FindFirstChildOfClass("Camera").CFrame)
-    end)
-
-    cd.MouseClick:Once(function()
-        conn:Disconnect()
-        cd.Parent = old_parent
-        p:Destroy()
-    end)
-end
-
-function getrunningscripts()
-    local returnable = {}
-
-    for _, v in ipairs(game:GetDescendants()) do
-        if v:IsA("LocalScript") or v:IsA("ModuleScript") then
-            if not v:IsA("ModuleScript") and v.Enabled then
-                returnable[#returnable + 1] = v
-            elseif v:IsA("ModuleScript") then
-                returnable[#returnable + 1] = v
-            end
-        end
-    end
-
-    return returnable
-end
-
-function getinstances()
-	return game:GetDescendants()
-end
-
-function getscripts()
-	local a = {}
-	for i,v in pairs(getinstances()) do
-		if v:IsA("LocalScript") or v:IsA("ModuleScript") then
-			table.insert(a, v)
+wrap = function(real)
+	for w, r in next, wrappercache do
+		if r == real then
+			return w
 		end
 	end
-	return a
-end
 
-function getloadedmodules()
-	local b = {}
-	for i,v in pairs(getscripts()) do
-		if v:IsA("ModuleScript") then
-			table.insert(b, v)
+	if type(real) == "userdata" then
+		local fake = newproxy(true)
+		local meta = getmetatable(fake)
+
+		meta.__index = function(s, k)
+			if k == "HttpGet" or k == "HttpGetAsync" then
+				return function(self, url)
+					local s, r = nil, nil
+
+					game:GetService("HttpService"):RequestInternal({
+						Url = url,
+						Method = "GET"
+					}):Start(function(a, b)
+						s, r = a, b
+					end)
+
+					repeat task.wait() until (s ~= nil or r ~= nil)
+					return r.Body
+				end
+			elseif k == "GetObjects" then
+				return function(self, assetid)
+					assert(
+						typeof(assetid) == "string" or assetid:find("rbxassetid://"),
+						"arg #1 not a valid asset id."
+					)
+
+					return {insert_service:LoadLocalAsset(assetid)}
+				end
+			end
+
+			return typeof(real[k]) == "Instance" and real[k] or wrap(real[k])
 		end
+
+		meta.__newindex = function(s, k, v)
+			real[k] = v
+		end
+
+		meta.__tostring = function(s)
+			return tostring(real)
+		end
+
+		wrappercache[fake] = real
+		return (typeof(real) == "Instance" and real.ClassName ~= "DataModel") and real or fake
+	elseif typeof(real) == "Instance" then
+		return real
+	elseif type(real) == "function" then
+		local fake = function(...)
+			local args = unwrap{...}
+			local results = wrap{real(unpack(args))}
+			return unpack(results)
+		end
+		wrappercache[fake] = real
+		return fake
+	elseif type(real) == "table" then
+		local fake = {}
+		for k, v in next, real do
+			fake[k] = (typeof(v) == "Instance" and v.ClassName ~= "DataModel") and v or wrap(v)
+		end
+		return fake
+	else
+		return real
 	end
-	return b
 end
 
-function getscripthash(a)
-    assert(typeof(a) == "Instance" and a:IsA("LuaSourceContainer"), "argument #1 is not a 'LuaSourceContainer'", 0)
-    return a:GetHash()
-end
-
-function getgenv(a, b)
-	return a and b and rawset(getfenv(), a, b) or rawget(getfenv(), a) or setmetatable({}, {__index = getfenv(),__newindex = function(self, index, value)getfenv()[index] = value end})
-end
-
-function gethui()
-	return game:GetService("CoreGui")
-end
-
-function compareinstances(t1, t2)
-    if t1 == t2 then
-        return true
-    end
-    local Properties = {LinkedSource,Source,FontFace,LineHeight,MaxVisibleGraphemes,OpenTypeFeatures,RichText,Text,TextColor3,TextDirection,TextScaled,TextSize,TextStrokeColor3,TextStrokeTransparency,TextTransparency,TextTruncate,TextWrapped,TextXAlignment,TextYAlignment,Style,CFrame,Visible,MaxTextSize,MinTextSize,Image,ImageColor3,ImageRectOffset,ImageRectSize,ImageTransparency,ResampleMode,ScaleType,SliceCenter,SliceScale,TileSize,DoubleSided,MeshId,TextureID,Value,HorizontalFlex,ItemLineAlignment,Padding,VerticalFlex,Wraps,AutoJumpEnabled,CameraMaxZoomDistance,CameraMinZoomDistance,CameraMode,CanLoadCharacterAppearance,Character,CharacterAppearance,CharacterAppearanceId,DevCameraOcclusionMode,DevComputerCameraMode,DevComputerMovementMode,DevEnableMouseLock,DevTouchCameraMode,DevTouchMovementMode,DisplayName,GameplayPaused,HasVerifiedBadge,HealthDisplayDistance,NameDisplayDistance,Neutral,ReplicationFocus,RespawnLocation,TeamColor,UserId,userId,HoverImage,PressedImage,AnimationId,Stiffness,AutoRotate,AutomaticScalingEnabled,BreakJointsOnDeath,CameraOffset,CollisionType,DisplayDistanceType,EvaluateStateMachine,HealthDisplayType,HipHeight,JumpHeight,JumpPower,MaxHealth,MaxSlopeAngle,NameOcclusion,PlatformStand,RequiresNeck,RigType,Sit,TargetPoint,UseJumpPower,WalkSpeed,WalkToPart,WalkToPoint,PaddingBottom,PaddingLeft,PaddingRight,PaddingTop,ShirtTemplate,AccessoryBlob,BackAccessory,BodyTypeScale,ClimbAnimation,DepthScale,Face,FaceAccessory,FallAnimation,FrontAccessory,GraphicTShirt,HairAccessory,HatAccessory,Head,HeadColor,HeadScale,HeightScale,IdleAnimation,JumpAnimation,LeftArm,LeftArmColor,LeftLeg,LeftLegColor,MoodAnimation,NeckAccessory,Pants,ProportionScale,RightArm,RightArmColor,RightLeg,RightLegColor,RunAnimation,Shirt,ShouldersAccessory,SwimAnimation,Torso,TorsoColor,WaistAccessory,WalkAnimation,WidthScale,CornerRadius,EmitterSize,LoopRegion,Looped,MaxDistance,MinDistance,Pitch,PlayOnRemove,PlaybackRegion,PlaybackRegionsEnabled,RollOffMode,SoundGroup,SoundId,Volume,HeadColor3,LeftArmColor3,LeftLegColor3,RightArmColor3,RightLegColor3,TorsoColor3,Color3,Texture,Transparency,ZIndex,ApiKey,AutomaticCanvasSize,BottomImage,CanvasPosition,CanvasSize,ElasticBehavior,HorizontalScrollBarInset,MidImage,ScrollBarImageColor3,ScrollBarImageTransparency,ScrollBarThickness,ScrollingDirection,ScrollingEnabled,TopImage,VerticalScrollBarInset,VerticalScrollBarPosition,ClipToDeviceSafeArea,DisplayOrder,IgnoreGuiInset,SafeAreaCompatibility,ScreenInsets,AccessoryType,AssetId,Instance,IsLayered,Order,Position,Puffiness,Rotation,Scale,AspectRatio,AspectType,DominantAxis,Graphic,CanSend,MeshType,PantsTemplate,PreferLodEnabled,AutomaticScaling,AvatarGestures,ControllerModels,FadeOutViewOnCollision,LaserPointer,Active,Adornee,AlwaysOnTop,Brightness,ClipsDescendants,DistanceLowerLimit,DistanceStep,DistanceUpperLimit,ExtentsOffset,ExtentsOffsetWorldSpace,LightInfluence,PlayerToHideFrom,Size,SizeOffset,StudsOffset,StudsOffsetWorldSpace,BodyPart,Color,Enabled,Offset,ScreenOrientation,SelectionImageObject,AlphaMode,ColorMap,MetalnessMap,NormalMap,RoughnessMap,TexturePack,LevelOfDetail,ModelStreamingMode,PrimaryPart,AutocompleteVisible,PrimaryAlias,SecondaryAlias,AllowTeamChangeOnTouch,Duration,ClearTextOnFocus,CursorPosition,MultiLine,PlaceholderColor3,PlaceholderText,SelectionStart,ShowNativeInput,TextEditable,MaxSize,MinSize,AirDensity,AvatarUnificationMode,CSGAsyncDynamicCollision,ClientAnimatorThrottling,DecreaseMinimumPartDensityMode,FallenPartsDestroyHeight,FluidForces,GlobalWind,Gravity,IKControlConstraintSupport,MeshPartHeadsAndAccessories,ModelStreamingBehavior,MoverConstraintRootBehavior,PhysicsSteppingMethod,PlayerCharacterDestroyBehavior,PrimalPhysicsSolver,RejectCharacterDeletions,RenderingCacheOptimizations,ReplicateInstanceDestroySetting,Retargeting,SignalBehavior,StreamOutBehavior,StreamingEnabled,StreamingIntegrityMode,StreamingMinRadius,StreamingTargetRadius,TouchesUseCollisionGroups,MaxPromptsVisible,IsCaptureModeForReport,AutoRuns,Description,ExecuteWithStudioRun,IsSleepAllowed,NumberOfPlayers,SimulateSecondsLag,Timeout,SourceLocaleId,AutoUpdate,DefaultName,SerializedDefaultAttributes,GamepadCursorEnabled,Ambient,ColorShift_Bottom,ColorShift_Top,EnvironmentDiffuseScale,EnvironmentSpecularScale,ExposureCompensation,FogColor,FogEnd,FogStart,GeographicLatitude,GlobalShadows,OutdoorAmbient,Outlines,ShadowSoftness,Technology,TimeOfDay,MaxItems,AllowClientInsertModels,LineThickness,SurfaceColor3,SurfaceTransparency,CellPadding,CellSize,FillDirectionMaxCells,StartCorner,ApplyStrokeMode,LineJoinMode,Thickness,GroupColor3,GroupTransparency,ResolutionScale,AutocompleteEnabled,BackgroundColor3,BackgroundTransparency,KeyboardKeyCode,TargetTextChannel,TextBox,AdorneeName,BubbleDuration,BubblesSpacing,LocalPlayerStudsOffset,MaxBubbles,MinimizeDistance,TailVisible,VerticalStudsOffset,BaseTextureId,OverlayTextureId,CameraSubject,CameraType,FieldOfView,FieldOfViewMode,Focus,HeadLocked,VRTiltAndRollEnabled,AutoSkin,BindOffset,ReferenceMeshId,ReferenceOrigin,ShrinkFactor,EnableDefaultVoice,UseAudioApi,AutoSelectGuiEnabled,GuiNavigationEnabled,SelectedObject,TouchControlsEnabled,RespawnTime,UseStrafingAnimations,CameraButtonIcon,CameraButtonPosition,CloseButtonPosition,CloseWhenScreenshotTaken,HideCoreGuiForCaptures,HidePlayerGuiForCaptures,Acceleration,Drag,EmissionDirection,FlipbookFramerate,FlipbookIncompatible,FlipbookLayout,FlipbookMode,FlipbookStartRandom,Lifetime,LightEmission,LockedToPart,Orientation,Rate,RotSpeed,Shape,ShapeInOut,ShapePartial,ShapeStyle,Speed,SpreadAngle,Squash,TimeScale,VelocityInheritance,WindAffectsDrag,ZOffset,ResetPlayerGuiOnSpawn,RtlTextSupport,ShowDevelopmentGui,VirtualCursorMode,CharacterJumpHeight,CharacterJumpPower,CharacterMaxSlopeAngle,CharacterUseJumpPower,CharacterWalkSpeed,DevComputerCameraMovementMode,DevTouchCameraMovementMode,EnableDynamicHeads,EnableMouseLockOption,LoadCharacterAppearance,LuaCharacterController,UserEmotesEnabled,HorizontalAlignment,VerticalAlignment,Decoration,GrassLength,MaterialColors,WaterColor,WaterReflectance,WaterTransparency,WaterWaveSize,WaterWaveSpeed,AsphaltName,BasaltName,BrickName,CardboardName,CarpetName,CeramicTilesName,ClayRoofTilesName,CobblestoneName,ConcreteName,CorrodedMetalName,CrackedLavaName,DiamondPlateName,FabricName,FoilName,GlacierName,GraniteName,GrassName,GroundName,IceName,LeafyGrassName,LeatherName,LimestoneName,MarbleName,MetalName,MudName,PavementName,PebbleName,PlasterName,PlasticName,RockName,RoofShinglesName,RubberName,SaltName,SandName,SandstoneName,SlateName,SmoothPlasticName,SnowName,WoodName,WoodPlanksName,HttpEnabled,ModalEnabled,MouseBehavior,MouseIcon,MouseIconEnabled,BubbleChatEnabled,LoadDefaultChat,AmbientReverb,DistanceFactor,DopplerScale,RespectFilteringEnabled,RolloffScale,VolumetricAudio,ChatVersion,CreateDefaultCommands,CreateDefaultTextChannels,CanSend}
-
-    for _, property in ipairs(Properties) do
-        if t1[property] ~= nil and t2[property] ~= nil then
-            if t1[property] ~= t2[property] then
-                return false
-            end
-        end
-    end
-    return true
-end
-
-function clonefunction(p1)
-	assert(type(p1) == "function", "invalid argument #1 to 'clonefunction' (function expected, got " .. type(p1) .. ") ", 2)
-	local A = p1
-	local B = xpcall(setfenv, function(p2, p3)
-		return p2, p3
-	end, p1, getfenv(p1))
-	if B then
-		return function(...)
-			return A(...)
+unwrap = function(wrapped)
+	if type(wrapped) == "table" then
+		local real = {}
+		for k, v in next, wrapped do
+			real[k] = unwrap(v)
 		end
+		return real
+	else
+		local real = wrappercache[wrapped]
+		if real == nil then
+			return wrapped
+		end
+		return real
 	end
-	return coroutine.wrap(function(...)
-		while true do
-			A = coroutine.yield(A(...))
-		end
-	end)
 end
 
-function islclosure(func)
-	assert(type(func) == "function", "invalid argument #1 to 'islclosure' (function expected, got " .. type(func) .. ") ", 2)
-	local success = pcall(function()
-		return setfenv(func, getfenv(func))
-	end)
-	return success
-end
-	
-function iscclosure(func)
-	assert(type(func) == "function", "invalid argument #1 to 'iscclosure' (function expected, got " .. type(func) .. ") ", 2)
-    return not islclosure(func)
-end
-
-function isreadonly(tbl)
- if type(tbl) ~= 'table' then return false end
- return table.isfrozen(tbl)
-end
-
-function newcclosure(p1)
-	return coroutine.wrap(function(...)
-		while true do
-			coroutine.yield(p1(...))
-		end
-	end)
-end
- 
-function getrenv()
-    return {}
-end
-
-	function lz4compress(input)
-    local output = ""
-    local pos = 1
-    local len = #input
-    while pos <= len do
-        local max_match_len = 0
-        local max_match_pos = pos
-        local len = #input
-        for i = pos - 1, 1, -1 do
-            local match_len = 0
-            while i + match_len <= len and input:sub(pos + match_len, pos + match_len) == input:sub(i + match_len, i + match_len) do
-                match_len = match_len + 1
-            end
-            if match_len > max_match_len then
-                max_match_len = match_len
-                max_match_pos = i
-            end
-        end
-        local match_pos, match_len = max_match_pos, max_match_len
-        if match_len > 4 then
-            output = output .. "*" .. string.char(math.floor(match_pos / 256)) .. string.char(match_pos % 256) .. string.char((match_len - 4) % 256)
-            pos = pos + match_len
-        else
-            output = output .. input:sub(pos, pos)
-            pos = pos + 1
-        end
-    end
-    return output
-end
- 
-function lz4decompress(input)
-    local output = ""
-    local pos = 1
-    local len = #input
-    while pos <= len do
-        local byte = input:sub(pos, pos)
-        if byte == "*" then
-            local match_pos = input:byte(pos + 1) * 256 + input:byte(pos + 2)
-            local match_len = input:byte(pos + 3) + 4
-            output = output .. output:sub(#output - match_pos + 1, #output - match_pos + match_len)
-            pos = pos + 4
-        else
-            output = output .. byte
-            pos = pos + 1
-        end
-    end
-    return output
-end
+game = wrap(Game)
